@@ -1,18 +1,19 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  ScrollView,
   View,
   Text,
   StyleSheet,
   Pressable,
   Modal,
+  BackHandler,
 } from 'react-native';
-import WebView from 'react-native-webview';
+import { WebView } from 'react-native-webview';
 import Background from '../components/Background';
 import SearchBar from '../components/SearchBar';
 import EcomTile from '../components/EcomTile';
 import LatestPurchasesTile from '../components/LatestPurchasesTile';
+import PiePayComparison from '../components/PiePayComparison.tsx';
 
 // ---------- mock data ---------- //
 const MOCK_MERCHANTS = [
@@ -20,12 +21,12 @@ const MOCK_MERCHANTS = [
     id: 'flipkart',
     name: 'Flipkart',
     logoUrl:
-      'https://www.google.com/url?sa=i&url=https%3A%2F%2Fin.pinterest.com%2Fpin%2Fflipkart-logo-png-images--850547079633661907%2F&psig=AOvVaw08MSXC-TTcdes9F2TB-q1D&ust=1753611827273000&source=images&cd=vfe&opi=89978449&ved=0CBUQjRxqFwoTCIDijaKn2o4DFQAAAAAdAAAAABAE',
+      'https://bugbasev1.blob.core.windows.net/public/programs/flipkart-nyd/7ae67f2fd71b273481efa7316e4cf0c9d7ba7323/profile/1723544173323-hdflipkartroundlogoicontransparentpng701751694966204grvmunpzzfremovebgpreview.png',
     websiteUrl: 'https://www.flipkart.com',
     categories: [
       {
         title: 'Mobiles',
-        imageUrl: 'https://img.icons8.com/fluency/96/000000/iphone-x1.png',
+        imageUrl: 'https://m.media-amazon.com/images/I/61BGE6iu4AL._AC_UY218_.jpg',
         productPageUrl: 'https://www.flipkart.com/mobile-phones-store',
       },
       {
@@ -89,7 +90,7 @@ const MOCK_PRODUCTS = [
       'https://www.flipkart.com/dell-latitude-3440-2024-intel-core-i3-12th-gen-1215u-8-gb-512-gb-ssd-windows-11-pro-business-laptop/p/itm7f265faf0871e?pid=COMH5G3F8BGPNY9N',
   },
   {
-    id: 3,
+    id: 4,
     title: 'Wrist Watch',
     imageUrl:
       'https://www.vaerwatches.com/cdn/shop/files/38-wristWrist-Shot-Lime.jpg?v=1712715073&width=600',
@@ -103,6 +104,9 @@ const ExploreScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState(MOCK_PRODUCTS);
   const [webUri, setWebUri] = useState(null);
+  const [piePayTitle, setPiePayTitle] = useState(null);
+
+  const webViewRef = useRef(null);
 
   const onSubmitSearch = () => {
     setWebUri('https://www.flipkart.com/search?q=' + searchQuery);
@@ -113,60 +117,153 @@ const ExploreScreen = () => {
     (a, b) => b - a,
   );
 
+  useEffect(() => {
+    if (!webUri) {
+      setPiePayTitle(null);
+    }
+
+    const backAction = () => {
+      if (webUri) {
+        setWebUri(null); // close modal
+        return true; // prevent default back navigation
+      }
+      return false; // allow normal back behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction,
+    );
+
+    return () => backHandler.remove();
+  }, [webUri]);
+
+  const injectedJavaScript = `
+    const scraper = () => {
+      try {
+        setTimeout(() => {
+          const data = {};
+          
+          const titleElement = document.querySelector('h1 span');
+          data.productTitle = titleElement ? titleElement.innerText.trim() : '';
+         
+          const discountElement = document.querySelectorAll('.css-1rynq56.r-173mn98');
+          data.wowDealPrice = discountElement && discountElement.length > 1 ? discountElement[1].innerText.trim() : '';
+
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'SCRAPED_DATA',
+            data: data
+          }));
+          
+        }, 3000); // Wait 3 seconds for dynamic content to load
+        
+      } catch (error) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'ERROR',
+          error: error.message
+        }));
+      }
+    };
+
+    scraper();
+    window.onload = () => scraper();
+    true; // This is required
+  `;
+
+  function convertProductData(product) {
+    const numericPrice = parseInt(
+      product.wowDealPrice.replace(/[^0-9]/g, ''),
+      10,
+    );
+
+    return {
+      productTitle: product.productTitle,
+      wowDealPrice: numericPrice,
+    };
+  }
+
+  const handleMessage = async event => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+
+      if (message.type === 'SCRAPED_DATA') {
+        const data = convertProductData(message.data);
+        const response = await fetch('http://localhost:3000/api/prices', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        if (response.ok) {
+          setPiePayTitle(data.productTitle);
+        }
+      } else if (message.type === 'ERROR') {
+        console.error('Scraping error:', message.error);
+      }
+    } catch (error) {
+      console.error('Message parsing error:', error);
+    }
+  };
+
   return (
     <Background>
-      <ScrollView>
-        {/* Header Section */}
-        <HeaderSection />
+      {/* Header Section */}
+      <HeaderSection />
 
-        {/* Searchbar */}
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search products, categories, ..."
-          onSubmit={onSubmitSearch}
-        />
+      {/* Searchbar */}
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search products, categories, ..."
+        onSubmit={onSubmitSearch}
+      />
 
-        {/* Merchants Section */}
-        {MOCK_MERCHANTS.map(merchant => (
-          <EcomTile
-            key={merchant.id}
-            merchant={merchant}
-            onPress={() => {
-              // For this assignment, we hard-code Flipkart regardless of merchant pressed.
-              // You can swap merchant.websiteUrl if dynamic behaviour is needed.
-              setWebUri('https://www.flipkart.com');
-            }}
-          />
-        ))}
+      {/* Merchants Section */}
+      {MOCK_MERCHANTS.map(merchant => (
+        <EcomTile key={merchant.id} merchant={merchant} setWebUri={setWebUri} />
+      ))}
 
-        {/* Latest purchases */}
-        <LatestPurchasesTile
-          products={products}
-          onRemove={id => {
-            const index = products.findIndex(p => p.id === id);
-            if (index !== -1) {
-              const newList = [...products];
-              newList.splice(index, 1);
-              setProducts(newList);
-            }
-          }}
-        />
-      </ScrollView>
+      {/* Latest purchases */}
+      <LatestPurchasesTile
+        products={products}
+        onRemove={id => {
+          const index = products.findIndex(p => p.id === id);
+          if (index !== -1) {
+            const newList = [...products];
+            newList.splice(index, 1);
+            setProducts(newList);
+          }
+        }}
+        setWebUri={setWebUri}
+      />
 
       {/* WebView modal */}
-      <Modal visible={!!webUri} animationType="slide">
+      <Modal
+        visible={!!webUri}
+        animationType="slide"
+        onRequestClose={() => setWebUri(null)}
+      >
         <View style={{ flex: 1 }}>
           <Pressable style={styles.closeBtn} onPress={() => setWebUri(null)}>
             <Text style={styles.closeText}>✕</Text>
           </Pressable>
           {webUri && (
             <WebView
-              // ref={WEBVIEW_REF}
+              ref={webViewRef}
               source={{ uri: webUri }}
-              startInLoadingState
+              injectedJavaScript={injectedJavaScript}
+              onMessage={handleMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              onNavigationStateChange={() => {
+                webViewRef.current.injectJavaScript(injectedJavaScript);
+              }}
+              userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36"
             />
           )}
+          {piePayTitle && <PiePayComparison title={piePayTitle} />}
         </View>
       </Modal>
     </Background>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet, Pressable } from 'react-native';
 
-const ProductTile = ({ product, onPress, onRemove }) => {
+const ProductTile = React.memo(({ product, onPress, onRemove }) => {
   return (
     <Pressable onPress={onPress} style={styles.container}>
       <View style={styles.imageWrapper}>
@@ -21,7 +21,7 @@ const ProductTile = ({ product, onPress, onRemove }) => {
       </Pressable>
     </Pressable>
   );
-};
+});
 
 export default ProductTile;
 

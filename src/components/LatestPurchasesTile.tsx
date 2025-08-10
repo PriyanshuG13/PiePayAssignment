@@ -1,21 +1,16 @@
 // @ts-nocheck
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  Modal,
-  Pressable,
-} from 'react-native';
+import React from 'react';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
 import ProductTile from './ProductTile';
-import WebView from 'react-native-webview';
 
 /**
  * Horizontal list of recently bought items.
  */
-const LatestPurchasesTile = ({ products = [], onRemove = () => {} }) => {
-  const [webUri, setWebUri] = useState(null);
+const LatestPurchasesTile = ({
+  products = [],
+  onRemove = () => {},
+  setWebUri = () => {},
+}) => {
   if (!products.length) return null;
 
   return (
@@ -38,22 +33,6 @@ const LatestPurchasesTile = ({ products = [], onRemove = () => {} }) => {
         )}
         contentContainerStyle={styles.listContent}
       />
-
-      {/* WebView modal */}
-      <Modal visible={!!webUri} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <Pressable style={styles.closeBtn} onPress={() => setWebUri(null)}>
-            <Text style={styles.closeText}>✕</Text>
-          </Pressable>
-          {webUri && (
-            <WebView
-              // ref={WEBVIEW_REF}
-              source={{ uri: webUri }}
-              startInLoadingState
-            />
-          )}
-        </View>
-      </Modal>
     </View>
   );
 };

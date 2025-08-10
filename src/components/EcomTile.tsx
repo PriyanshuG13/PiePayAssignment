@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,71 +7,70 @@ import {
   StyleSheet,
   Dimensions,
   Pressable,
-  Modal,
+  FlatList,
 } from 'react-native';
-import WebView from 'react-native-webview';
 
 const windowWidth = Dimensions.get('window').width;
 const itemsPerRow = 4;
 const circleSize = windowWidth * 0.2; // 20% of width
 
-const EcomTile = ({ merchant, onPress }) => {
-  const { name, categories, logoUrl } = merchant;
+const EcomTile = React.memo(({ merchant, setWebUri }) => {
+  const { name, categories, logoUrl, websiteUrl } = merchant;
 
-  if (categories && categories.length && !categories._mutated) {
-    categories.push({
-      title: 'More',
-      imageUrl: 'https://img.icons8.com/fluency/96/000000/more.png',
-    });
-  }
-  // Limit to two rows by default, allow expand/collapse
   const [expanded, setExpanded] = useState(false);
+  const [rows, setRows] = React.useState(categories);
 
-  const visibleCategories = expanded ? categories : categories.slice(0, 7);
+  useEffect(() => {
+    if (categories && categories.length) {
+      let temp = [...categories];
+      if (!temp.find(row => row.title === 'More')) {
+        temp = [
+          ...temp,
+          {
+            title: 'More',
+            imageUrl: 'https://img.icons8.com/fluency/96/000000/more.png',
+          },
+        ];
+      }
 
-  const rows = [];
-  for (let i = 0; i < visibleCategories.length; i += itemsPerRow) {
-    rows.push(visibleCategories.slice(i, i + itemsPerRow));
-  }
+      const visibleCategories = expanded ? temp : temp.slice(0, 7);
+      setRows(visibleCategories);
+    }
+  }, [categories, expanded]);
 
   const handleToggle = () => setExpanded(!expanded);
-  const [webUri, setWebUri] = useState(null);
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={onPress}>
+      <Pressable onPress={() => setWebUri(websiteUrl)}>
         <View style={styles.headerRow}>
           <Image source={{ uri: logoUrl }} style={styles.logo} />
           <Text style={styles.headerText}>Buy on {name}</Text>
         </View>
       </Pressable>
 
-      {/* category grid */}
-      {rows.map((row, rowIdx) => (
-        <View
-          key={`row-${rowIdx}`}
-          style={[
-            styles.row,
-            { justifyContent: row.length < 3 ? 'flex-start' : 'space-between' },
-          ]}
-        >
-          {row.map((cat, idx) => (
-            <Pressable
-              key={`cat-${idx}`}
-              style={styles.circle}
-              onPress={() => {
-                setWebUri(cat.productPageUrl);
-              }}
-            >
-              <Image
-                source={{ uri: cat.imageUrl }}
-                style={styles.categoryImage}
-              />
-              <Text style={styles.categoryTitle}>{cat.title}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
+      <FlatList
+        data={rows}
+        keyExtractor={item => item.title}
+        numColumns={itemsPerRow}
+        columnWrapperStyle={{ justifyContent: 'space-evenly' }}
+        renderItem={({ item: cat, index: idx }) => (
+          <Pressable
+            key={`cat-${idx}`}
+            style={styles.circle}
+            onPress={() => {
+              setWebUri(cat.productPageUrl);
+            }}
+          >
+            <Image
+              source={{ uri: cat.imageUrl }}
+              style={styles.categoryImage}
+            />
+            <Text style={styles.categoryTitle}>{cat.title}</Text>
+          </Pressable>
+        )}
+        contentContainerStyle={styles.listContent}
+      />
 
       {/* view more / less toggle */}
       {categories.length > 7 && (
@@ -81,19 +80,9 @@ const EcomTile = ({ merchant, onPress }) => {
           </Text>
         </Pressable>
       )}
-
-      {/* WebView modal */}
-      <Modal visible={!!webUri} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <Pressable style={styles.closeBtn} onPress={() => setWebUri(null)}>
-            <Text style={styles.closeText}>✕</Text>
-          </Pressable>
-          {webUri && <WebView source={{ uri: webUri }} startInLoadingState />}
-        </View>
-      </Modal>
     </View>
   );
-};
+});
 
 export default EcomTile;
 
@@ -107,29 +96,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   logo: {
-    height: 20,
-    width: 20,
+    height: 25,
+    width: 25,
+    marginLeft: 10
   },
   headerText: {
-    marginLeft: 10,
+    marginLeft: 5,
     fontSize: 16,
     fontWeight: '700',
     color: '#212121',
   },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
   circle: {
     width: circleSize,
     alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   categoryImage: {
     width: circleSize * 0.8,
     height: circleSize * 0.8,
     borderRadius: circleSize * 0.4,
     backgroundColor: '#FFF',
+    objectFit: 'contain',
   },
   categoryTitle: {
     marginTop: 6,
