@@ -1,6 +1,6 @@
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
-# Getting Started
+# Getting Started Frontend
 
 > **Note:** The project is configured for **Yarn**. Please use `yarn` commands instead of `npm`.
 
@@ -31,3 +31,30 @@ With Metro running, open a new terminal window/pane from the root of your React 
 ```sh
 yarn android
 ```
+
+
+
+# Getting Started Backend
+
+## Step 1: Open Right Directory
+
+```sh
+cd backend
+```
+
+## Step 2: Install dependencies
+
+Run the following command once to install all project packages:
+
+```sh
+npm install
+```
+
+## Step 3: Start Metro
+
+Now by running the following command start the backend express server.:
+
+```sh
+npm start
+```
+
